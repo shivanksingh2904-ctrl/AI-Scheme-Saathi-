@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SchemeSaathi</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#f5f7fa; margin:0; color:#1f2933; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { margin-bottom: 4px; }
+  .sub { color:#52606d; margin-top:0; }
+  textarea { width:100%; box-sizing:border-box; min-height:110px; padding:12px; font-size:16px;
+             border:1px solid #cbd2d9; border-radius:8px; resize:vertical; }
+  button { margin-top:10px; padding:10px 20px; font-size:16px; border:0; border-radius:8px;
+           background:#1f6feb; color:#fff; cursor:pointer; }
+  button:disabled { background:#9aa5b1; cursor:wait; }
+  .examples span { display:inline-block; margin:6px 6px 0 0; padding:4px 10px; font-size:13px;
+                   background:#e4e7eb; border-radius:14px; cursor:pointer; }
+  #result { margin-top:24px; background:#fff; padding:16px; border-radius:8px; display:none;
+            border:1px solid #e4e7eb; }
+  #answer { white-space:pre-wrap; line-height:1.5; }
+  #error { color:#b42318; margin-top:16px; }
+  .sources a { display:block; margin-top:4px; }
+  .note { font-size:13px; color:#7b8794; margin-top:24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SchemeSaathi</h1>
+  <p class="sub">Describe your situation and find government schemes and scholarships you may qualify for.</p>
+
+  <textarea id="q" maxlength="600"
+    placeholder="Example: I am a 20-year-old girl studying engineering and my family income is under 3 lakh."></textarea>
+  <div class="examples">
+    <span>I am a small farmer with 1 acre of land. What support can I get?</span>
+    <span>How can I get a loan for my MBA without collateral?</span>
+    <span>I want to start a small shop. Is there any loan without security?</span>
+  </div>
+  <button id="btn" onclick="ask()">Find schemes</button>
+
+  <div id="error"></div>
+  <div id="result">
+    <div id="answer"></div>
+    <h3>Sources</h3>
+    <div class="sources" id="sources"></div>
+  </div>
+
+  <p class="note">This is an information tool, not official or legal advice. Scheme rules change.
+  Always verify details on the official website before applying.</p>
+</main>
+
+<script>
+document.querySelectorAll('.examples span').forEach(el => {
+  el.onclick = () => { document.getElementById('q').value = el.textContent; };
+});
+
+async function ask() {
+  const q = document.getElementById('q').value.trim();
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('error');
+  const result = document.getElementById('result');
+  err.textContent = ''; result.style.display = 'none';
+
+  if (q.length < 10) { err.textContent = 'Please describe your situation in a little more detail.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Searching...';
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      err.textContent = typeof data.detail === 'string'
+        ? data.detail
+        : 'Please check your input (10 to 600 characters).';
+      return;
+    }
+    // textContent (not innerHTML) so model output can never inject HTML/JS
+    document.getElementById('answer').textContent = data.answer;
+    const box = document.getElementById('sources');
+    box.textContent = '';
+    data.sources.forEach(s => {
+      const a = document.createElement('a');
+      a.textContent = s.scheme;
+      if (s.url.startsWith('https://')) { a.href = s.url; a.target = '_blank'; a.rel = 'noopener'; }
+      box.appendChild(a);
+    });
+    result.style.display = 'block';
+  } catch (e) {
+    err.textContent = 'Could not reach the server. Is it running?';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Find schemes';
+  }
+}
+</script>
+</body>
+</html>
